@@ -3,6 +3,22 @@
 ⚠️ **零外部依赖**（领域层）—— 编排的核心概念可以独立复用。
 """
 
+from orchestra_core.application.ports import (
+    FlowRepositoryPort,
+    RunRepositoryPort,
+)
+from orchestra_core.application.use_cases import (
+    FlowContext,
+    SessionContext,
+    append_message,
+    create_flow,
+    create_session,
+    delete_flow,
+    get_flow,
+    list_flows,
+    update_flow,
+    validate_flow,
+)
 from orchestra_core.domain.entities import (
     Edge,
     ErrorInfo,
@@ -27,6 +43,13 @@ from orchestra_core.domain.run_status import (
     RunStatus,
     can_transition,
 )
+from orchestra_core.domain.session import (
+    ContentBlock,
+    DelegationRecord,
+    Message,
+    MessageRole,
+    Session,
+)
 from orchestra_core.domain.value_objects import (
     AccessLevel,
     EdgeId,
@@ -38,19 +61,31 @@ from orchestra_core.domain.value_objects import (
     RunId,
     SessionId,
 )
+from orchestra_core.infrastructure.memory import (
+    InMemoryFlowRepository,
+    InMemoryRunRepository,
+)
 
 __all__ = [
     "AccessLevel",
+    "ContentBlock",
     "CycleDetectedError",
+    "DelegationRecord",
     "Edge",
     "EdgeId",
     "ErrorInfo",
     "Flow",
+    "FlowContext",
     "FlowGraph",
     "FlowId",
+    "FlowRepositoryPort",
     "FlowValidationError",
     "FlowVersion",
+    "InMemoryFlowRepository",
+    "InMemoryRunRepository",
     "InvalidTransitionError",
+    "Message",
+    "MessageRole",
     "Node",
     "NodeId",
     "NodeNotFoundError",
@@ -62,11 +97,22 @@ __all__ = [
     "Position",
     "Run",
     "RunId",
+    "RunRepositoryPort",
     "RunStatus",
+    "Session",
+    "SessionContext",
     "SessionId",
     "Usage",
+    "append_message",
     "build_graph",
     "can_transition",
+    "create_flow",
+    "create_session",
+    "delete_flow",
     "find_cycle",
+    "get_flow",
+    "list_flows",
     "topological_sort",
+    "update_flow",
+    "validate_flow",
 ]

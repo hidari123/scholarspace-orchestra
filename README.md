@@ -46,10 +46,24 @@ libs/
 │       ├── application/         用例编排 + 端口协议
 │       └── infrastructure/      存储实现
 │
-└── orchestra-runtime/    DAG 调度器 + 节点执行
-    └── src/orchestra_runtime/
-        ├── executor.py     NodeExecutor 协议 + ExecutionContext
-        └── scheduler.py    Scheduler（拓扑调度 / 数据绑定 / 重试 / 成本）
+├── orchestra-runtime/   DAG 调度器 + 节点执行 + 节点注册表
+│   └── src/orchestra_runtime/
+│       ├── executor.py       NodeExecutor 协议 + ExecutionContext
+│       ├── scheduler.py      Scheduler（拓扑调度 / 数据绑定 / 重试 / 用量）
+│       ├── registry.py       NodeRegistry + NodeSpec（插件机制）
+│       └── builtin_nodes.py  llm / tool / branch / merge
+│
+└── orchestra-http/      HTTP 接口层（FastAPI + SSE）
+    └── src/orchestra_http/
+        ├── app.py          FastAPI 应用工厂
+        ├── dependencies.py 仓储与用例上下文
+        ├── schemas.py      请求/响应模型（Pydantic）
+        └── routers/
+            ├── flows.py    流程 CRUD + 校验
+            ├── runs.py     触发运行 + 查状态
+            ├── sessions.py 会话与消息
+            ├── nodes.py    节点市场
+            └── events.py   SSE 事件推送
 ```
 
 ⚠️ **core 与 runtime 的分工**：
@@ -152,6 +166,38 @@ class MyNodeExecutor(NodeExecutor):
 
 ---
 
+---
+
+## HTTP 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/orchestra/flows` | 创建流程（有环 → 422）|
+| GET | `/api/v1/orchestra/flows` | 列出流程 |
+| GET | `/api/v1/orchestra/flows/{id}` | 取流程 |
+| PUT | `/api/v1/orchestra/flows/{id}` | 更新流程（版本 +1）|
+| DELETE | `/api/v1/orchestra/flows/{id}` | 删除流程（幂等）|
+| POST | `/api/v1/orchestra/runs?flow_id=` | 触发运行（202）|
+| GET | `/api/v1/orchestra/runs/{id}` | 查运行状态 |
+| GET | `/api/v1/orchestra/runs?flow_id=` | 列出运行 |
+| GET | `/api/v1/orchestra/runs/{id}/events` | **SSE 事件流** |
+| POST | `/api/v1/orchestra/sessions` | 创建会话 |
+| GET | `/api/v1/orchestra/sessions/{id}` | 取会话 |
+| POST | `/api/v1/orchestra/sessions/{id}/messages` | 追加消息 |
+| GET | `/api/v1/orchestra/nodes` | 节点市场 |
+| GET | `/api/v1/orchestra/nodes/categories` | 节点分类 |
+
+### SSE 断线重连
+
+```
+GET /api/v1/orchestra/runs/{run_id}/events
+Last-Event-ID: 42        <- 或 ?after_seq=42
+```
+
+服务端从 `43` 开始补发 —— 这就是 events 服务的 `seq` 存在的意义。
+
+---
+
 ## 开发
 
 ```bash
@@ -161,7 +207,10 @@ cd libs/orchestra-core
 .venv/Scripts/python.exe -m mypy src/
 
 cd ../orchestra-runtime
-.venv/Scripts/python.exe -m pytest      # 18 tests
+.venv/Scripts/python.exe -m pytest      # 34 tests
+
+cd ../orchestra-http
+.venv/Scripts/python.exe -m pytest      # 33 tests
 ```
 
 ---
@@ -184,8 +233,10 @@ orchestra ──publish/subscribe──→ events（事件服务）
 
 ## 已知限制
 
-- **没有内置节点实现** —— 目前只有执行器协议与调度器，
-  具体节点（LLM / 工具 / 分支 / 合并）待补
-- **没有 HTTP 层** —— 会话管理、节点市场、SSE 端点待补
+- **会话是内存态** —— 进程重启就没了，要存 Redis/PostgreSQL
+- **运行没有真的执行** —— HTTP 层只创建了 run 记录，
+  实际的调度器调用待接（`Scheduler.run` 还没被路由调用）
 - **成本闸门未接** —— `ExecutionContext` 有 `budget_limit` 字段但没 enforcement
-- **Redis 实现缺失** —— 只在内存里跑
+- **PostgreSQL 实现缺失** —— 只有内存仓储
+- **学术专用节点未做** —— `paper_insight` / `slide_generate` 等，
+  要等 paper / slides 仓
