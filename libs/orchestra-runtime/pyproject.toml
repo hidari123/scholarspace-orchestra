@@ -1,0 +1,46 @@
+[project]
+name = "orchestra-runtime"
+version = "0.1.0"
+description = "scholarspace 编排引擎运行时 —— DAG 调度器与节点执行"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "Proprietary" }
+
+# ⚠️ runtime 依赖 core —— 但 core 是**同仓**的本地包。
+#    独立发布时用 `orchestra-core` 名字从 PyPI 拉。
+dependencies = [
+    "orchestra-core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.9",
+    "mypy>=1.14",
+]
+
+[tool.uv.sources]
+# ⚠️ 同仓本地依赖 —— 指向 libs/orchestra-core
+orchestra-core = { path = "../orchestra-core", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/orchestra_runtime"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/orchestra_runtime", "README.md"]
+
+[tool.ruff]
+extend = "./ruff.toml"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+addopts = "-ra --strict-markers --tb=short"
