@@ -16,7 +16,11 @@ from orchestra_core.domain.graph import build_graph
 from orchestra_core.domain.run_status import RunStatus
 from orchestra_core.domain.value_objects import FlowId, RunId
 
-from orchestra_http.dependencies import FlowContextDep, RunRepositoryDep
+from orchestra_http.dependencies import (
+    ExecutionServiceDep,
+    FlowContextDep,
+    RunRepositoryDep,
+)
 from orchestra_http.schemas import RunResponse
 
 __all__ = ["router"]
@@ -57,6 +61,7 @@ async def create_run_endpoint(
     flow_id: UUID,
     context: FlowContextDep,
     runs: RunRepositoryDep,
+    execution: ExecutionServiceDep,
 ) -> RunResponse:
     """触发一次运行。
 
@@ -90,6 +95,37 @@ async def create_run_endpoint(
         status=RunStatus.PENDING,
     )
     await runs.save(run)
+
+    # ⚠️ **启动执行但不等待** ——
+    # HTTP 请求不能等整个流程跑完（可能几分钟）。
+    # 前端拿 run_id 去订阅 SSE 看进度。
+    await execution.start(run, flow)
+
+    return _to_response(run)
+
+
+@router.post("/{run_id}/cancel", response_model=RunResponse)
+async def cancel_run_endpoint(
+    run_id: UUID,
+    runs: RunRepositoryDep,
+    execution: ExecutionServiceDep,
+) -> RunResponse:
+    """取消一次运行。
+
+    ⚠️ **取消不存在的运行 → 404** ——
+    客户端需要知道「取消没成功」。
+    """
+    run = await runs.get(run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"运行记录不存在：{run_id}",
+        )
+
+    cancelled = await execution.cancel(run_id)
+    if not cancelled:
+        # ⚠️ 没在跑（已经结束）—— 状态不变，不报错
+        pass
 
     return _to_response(run)
 

@@ -17,8 +17,12 @@ from orchestra_core.infrastructure.memory import (
     InMemoryFlowRepository,
     InMemoryRunRepository,
 )
+from orchestra_runtime.scheduler import Scheduler
+
+from orchestra_http.execution import ExecutionService
 
 __all__ = [
+    "get_execution_service",
     "get_flow_context",
     "get_flow_repository",
     "get_run_repository",
@@ -57,11 +61,31 @@ def get_session_context(
     return SessionContext(flows=flows, runs=runs)
 
 
+def get_execution_service(
+    runs: Annotated[RunRepositoryPort, Depends(get_run_repository)],
+) -> ExecutionService:
+    """执行服务依赖。
+
+    ⚠️ **必须用同一个 run 仓储** ——
+    执行服务保存的运行状态，要能被路由查到。
+    自己 `new` 一个仓储的话，路由永远查到 `pending`。
+
+    ⚠️ **调度器没有注册任何执行器** ——
+    HTTP 层不知道该用什么节点执行器。
+    生产环境在 `create_app(scheduler=...)` 里注入。
+    """
+    return ExecutionService(
+        scheduler=Scheduler({}),
+        run_repository=runs,
+    )
+
+
 #: 类型别名 —— 路由里用着清楚。
 FlowContextDep = Annotated[FlowContext, Depends(get_flow_context)]
 SessionContextDep = Annotated[SessionContext, Depends(get_session_context)]
 FlowRepositoryDep = Annotated[FlowRepositoryPort, Depends(get_flow_repository)]
 RunRepositoryDep = Annotated[RunRepositoryPort, Depends(get_run_repository)]
+ExecutionServiceDep = Annotated[ExecutionService, Depends(get_execution_service)]
 
 
 def dependency_overrides() -> dict[Callable[..., object], Callable[..., object]]:
